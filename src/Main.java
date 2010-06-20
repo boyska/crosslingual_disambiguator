@@ -2,24 +2,29 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /** HIGH-LEVEL description
- * Analyzing EuroParl data (without alignment) DONE
- * Cut off stopwords DONE (TODO: get a real stopwords list)
- * Word stemming with snow-ball DONE
- * Cut off phrases that doesn't have the target word DONE
- * Convert these data in a Weka-readable format:
- * * A matrix where each column is a word. A row is a sentence.
-     It is set on 1 or 0 according to the presence. 
-     The y has different values based on translation
- * Ask Weka to make a classifier based on this data
- * Run it (and test it)    
+ * Read directly from alignment gz file DONE
+ * * Strip out stopwords DONE
+ * * Stem words
+ * AlignedPhrase.toWekaLine()
+ * Alignment.toWeka() that wraps on AlignedPhrase.toWekaLine()
+ * Call Weka
+ * Run
+ * Test
  */
 
-public class Main {
 
-	static final protected Log log = LogFactory.getLog(Main.class);
+public class Main {
+	private static Log log = LogFactory.getLog(Stopwords.class);
+
 	public static void main(String[] args) {
-		Europarl data = new Europarl();
-		data.read_files();
-		data.restrict_to("interest");
+		//Europarl data = new Europarl();
+		//data.read_files();
+		//data.restrict_to("interest");
+		Alignment align = new Alignment();
+		
+		long startTime = System.currentTimeMillis();
+		align.getFromGz("data/it-en.A3.final.gz", 10000);
+		long endTime = System.currentTimeMillis();
+		Main.log.info("Done in " + (endTime - startTime)/1000.0 + " seconds");
 	}
 }

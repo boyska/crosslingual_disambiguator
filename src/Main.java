@@ -1,8 +1,7 @@
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import weka.core.Instances;
-import weka.core.converters.ArffSaver;
+
 import weka.core.stemmers.SnowballStemmer;
 
 /** HIGH-LEVEL description
@@ -18,14 +17,31 @@ import weka.core.stemmers.SnowballStemmer;
 
 
 public class Main {
-	private static Log log = LogFactory.getLog(Stopwords.class);
+	static Log log = LogFactory.getLog(Main.class);
 
 	public static void main(String[] args) {
+		
+		//GLOBAL OPTIONS
+		String target_word = new String("plane");
+		for(String arg: args)
+		{
+			if(arg.startsWith("-"))
+			{
+			}
+			else
+			{
+				target_word = arg;
+			}
+		}
+		if(!Cfg.load_config("config/configuration.properties"))
+			return;
+		
+		
 		WordAlignment align = new WordAlignment();
 		
 		long startTime = System.currentTimeMillis();
-		//align.setStemmer(new SnowballStemmer());
-		align.getFromGz("data/it-en.A3.final.gz", "tax", 10000);
+		align.setStemmer(new SnowballStemmer("english"));
+		align.getFromGz("data/it-en.A3.final.gz", target_word, -1);
 		long endTime = System.currentTimeMillis();
 		Main.log.info("Read in " + (endTime - startTime)/1000.0 + " seconds");
 		align.print();
@@ -33,21 +49,7 @@ public class Main {
 		endTime = System.currentTimeMillis();
 		Main.log.info("Converted n " + (endTime - startTime)/1000.0 + " seconds");
 		
-		align.saveToArff("./data/dataset.arff");
+		align.saveToArff("./data/dataset_" + target_word + ".arff");
 		
-		
-/*		ArffSaver saver = new ArffSaver();
-		
-		saver.setInstances(instances);
-		try {
-			saver.setFile(new File("./data/dataset.arff"));
-			Main.log.info("started saving");
-			saver.writeBatch();
-			Main.log.info("saved");
-		} catch (Exception e) {
-			// TODO: handle exception
-			Main.log.error("Errore nella scrittura del file: " + e);
-		}*/
-
 	}
 }

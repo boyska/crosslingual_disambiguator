@@ -1,0 +1,12 @@
+The goal of this project is to implement a simple cross-lingual WordSense
+Disambiguator that takes data from EuroParl, parse them, postprocess them in
+order to reduce the noise and convert them to ARFF file format, so that Weka
+can use them to build a classifier.
+
+Note that a classifier can disambiguate just _one_ word.
+
+DEPENDENCIES:
+* commons-logging
+* commons-configuration
+* snowball (for stemming) [optional with minor code changes]
+

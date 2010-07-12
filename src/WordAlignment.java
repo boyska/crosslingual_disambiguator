@@ -8,7 +8,6 @@ import org.apache.commons.logging.LogFactory;
 
 import weka.core.Instances;
 import weka.core.Attribute;
-import weka.core.FastVector;
 import weka.core.SparseInstance;
 import weka.core.converters.ArffSaver;
 import weka.core.stemmers.Stemmer;
@@ -54,6 +53,12 @@ class PhraseTranslation
 	public String getTranslatedWord() {
 		return translatedWord;
 	}
+	public void removeWord(String word) {
+		/* This is useful to do "pruning" on the dataset */
+		int index;
+		while((index = phraseWords.indexOf(word)) != -1)
+			phraseWords.remove(index);
+	}
 }
 
 public class WordAlignment {
@@ -79,7 +84,6 @@ public class WordAlignment {
 	{
 		return getFromGz(fileName, targetWord, -1);
 	}
-	@SuppressWarnings("deprecation")
 	public boolean getFromGz(String fileName, String targetWord, int limit)
 	{
 		String strLine;
@@ -89,13 +93,12 @@ public class WordAlignment {
 		Pattern word_align = Pattern.compile("(\\w+) \\(\\{(.*?)\\}\\) ");
 
 
-		HashSet<String> words_list = new HashSet<String>(); //Set of ALL words: it will be the list of attributes
+		Bag<String> words_list = new Bag<String>(); //Set of ALL words: it will be the list of attributes
 		ArrayList<PhraseTranslation> translations = new ArrayList<PhraseTranslation>();
 		try {
 			gzipReader = new BufferedReader(new InputStreamReader(
 					new GZIPInputStream(new FileInputStream(fileName))));
 			
-
 			while ((strLine = gzipReader.readLine()) != null) //read-everything
 			{
 				line_triple.add(strLine);
@@ -162,13 +165,20 @@ public class WordAlignment {
 			return false;
 		}
 		
-		log.info("Collected " + translations.size() + " phrases");
+		//what we NOW have: a set of attributes in HashSet<String>words_list
+		//a ArrayList<PhraseTranslation> translations		
+		log.info("Collected " + translations.size() + " phrases and " 
+				+ words_list.size() + " words");
+		
+		postProcessData(translations, words_list);
+		
+		
 		//now convert the data we collected to Weka data
 		//we needed to do "double passing" because we need to initialize
 		//the dataset with the complete list of attributes
 		
 		//this will convert word to attributes: they are all "boolean"
-		FastVector<Attribute> attrs = new FastVector<Attribute>();
+		ArrayList<Attribute> attrs = new ArrayList<Attribute>();
 		HashMap<String, Attribute> attrs_map = new HashMap<String, Attribute>();
 		Attribute att;
 		for (String word : words_list) {
@@ -180,7 +190,7 @@ public class WordAlignment {
 		//now we need to manage class.
 		//each translation is a class, so we need to get all of them
 		HashMap<String, Integer> class_map = new HashMap<String, Integer>();
-		FastVector<String> classes = new FastVector<String>();
+		ArrayList<String> classes = new ArrayList<String>();
 		for (PhraseTranslation phraseTranslation : translations) {
 			if(!class_map.containsKey(phraseTranslation.getTranslatedWord())) 
 			{	
@@ -189,6 +199,11 @@ public class WordAlignment {
 				classes.add(phraseTranslation.getTranslatedWord());
 			}
 		}
+
+		log.info(targetWord + " has " + classes.size() + " translations:");
+		if(log.isInfoEnabled())
+			for (String translation : classes)
+				System.out.println(translation);
 		att = new Attribute("%class", classes);
 		attrs.add(att);
 		attrs_map.put("%class", att);
@@ -210,6 +225,66 @@ public class WordAlignment {
 		
 		return true;
 	}
+	private void postProcessData(ArrayList<PhraseTranslation> translations,
+			Bag<String> words_list) {
+		//it can remove useless attributes (in a COHERENT way: both from words_list and from translations)
+		//it can remove instances (so it can even remove whole classes)
+		log.debug("Start preprocessing");
+		HashSet<String> to_remove = new HashSet<String>();
+		
+		//BEGIN removing too many classes
+		Bag<String> classes = new Bag<String>();
+		for (PhraseTranslation phraseTranslation : translations) {
+			classes.add(phraseTranslation.getTranslatedWord());
+		}
+		if(log.isDebugEnabled())
+			for(String translation: classes)
+				if(classes.getCount(translation)>2)
+					System.out.println("Class " + translation + " : " + classes.getCount(translation));
+
+		ArrayList<Integer> class_occurrencies = new ArrayList<Integer>(classes.values());
+		java.util.Collections.sort(class_occurrencies);
+		System.out.println("CLASS OCC " + class_occurrencies);
+		ArrayList<PhraseTranslation> tr_to_remove = new ArrayList<PhraseTranslation>();
+		for(String cl: classes) {
+			if(classes.getCount(cl) < 
+					class_occurrencies.get(class_occurrencies.size() - 
+							Cfg.cfg.getInt("target_classes", 4))) {
+				for (PhraseTranslation phraseTranslation : translations) {
+					if(phraseTranslation.getTranslatedWord().equals(cl))
+						tr_to_remove.add(phraseTranslation);
+				}
+			}
+		}
+		for(PhraseTranslation phraseTranslation: tr_to_remove) {
+			for (String word : phraseTranslation.getPhraseWords()) {
+				words_list.countdown(word);
+			}
+			translations.remove(phraseTranslation);
+		}
+		System.out.println(translations.size());
+
+		//END removing too many classes
+
+		//BEGIN removing "useless" words, ie words with less than K occurrences
+		for(String word: words_list) {
+			assert 2 == Cfg.cfg.getInt("minimum_word_occurrencies");
+			if(words_list.getCount(word) <= Cfg.cfg.getInt("minimum_word_occurrencies") || 
+					words_list.getCount(word) >= translations.size()*50/100) {
+				log.debug(word + "occurs only" + words_list.getCount(word) + " times");
+				to_remove.add(word);
+			}
+		}
+		for (String word : to_remove) {
+			words_list.remove(word);
+			for (PhraseTranslation trans : translations) 
+				trans.removeWord(word);
+		}
+		log.info("Useless words: " + to_remove.size() + ". Now: " + words_list.size());
+		to_remove.clear();
+		//END removing "useless" words
+
+	}
 	public void saveToArff(String fileName)
 	{
 		ArffSaver saver = new ArffSaver();
@@ -221,7 +296,6 @@ public class WordAlignment {
 			saver.writeBatch();
 			log.info("saved");
 		} catch (Exception e) {
-			// TODO: handle exception
 			log.error("Errore nella scrittura del file: " + e);
 		}
 	}
@@ -231,7 +305,6 @@ public class WordAlignment {
 			System.out.println(phrase.toString());
 		}
 	}
-	//TODO: toARFF()
 	
 	public ArrayList<AlignedPhrase> getPhrases() {
 		return phrases;

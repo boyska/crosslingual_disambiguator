@@ -1,3 +1,4 @@
+package europarl;
 /*
     Copyright (C) 2010  Davide Lo Re
 

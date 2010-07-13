@@ -1,3 +1,4 @@
+package europarl;
 /*
     Copyright (C) 2010  Davide Lo Re
 
@@ -27,8 +28,7 @@ import weka.core.stemmers.SnowballStemmer;
  * * Stem words
  * Alignment is converted to Instances using AlignmentClassifier
  * Instances can be converted to arff using weka.core.ArffSaver
- * Call Weka
- * Run
+ * Classify with Weka
  * Test
  */
 

@@ -1,3 +1,4 @@
+package europarl;
 /*
  * FindBugs - Find Bugs in Java programs
  * Copyright (C) 2003-2007 University of Maryland
